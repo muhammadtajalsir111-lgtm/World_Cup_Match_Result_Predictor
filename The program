@@ -1,0 +1,92 @@
+# 1. Download Data
+# --------------------------
+!pip install kaggle
+!kaggle datasets download -d martj42/international-football-results-from-1872-to-2017
+!unzip -o international-football-results-from-1872-to-2017.zip
+
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import accuracy_score
+
+df = pd.read_csv('results.csv')
+print(f"Total matches: {len(df)}")
+
+# --------------------------
+# 2. Add Target Column
+# --------------------------
+df['result'] = df.apply(
+    lambda r: 'Win' if r.home_score > r.away_score 
+              else ('Loss' if r.home_score < r.away_score else 'Draw'),
+    axis=1
+)
+
+# --------------------------
+# 3. Encode Teams (Correct Solution)
+# --------------------------
+le = LabelEncoder()
+
+# Combine all teams to ensure the encoder learns all unique teams from both Home and Away
+all_teams = pd.concat([df['home_team'], df['away_team']]).unique()
+le.fit(all_teams)
+
+df['home_enc'] = le.transform(df['home_team'])
+df['away_enc'] = le.transform(df['away_team'])
+
+# --------------------------
+# 4. Train Model
+# --------------------------
+X = df[['home_enc', 'away_enc']]
+y = df['result']
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+model = RandomForestClassifier(random_state=42)
+model.fit(X_train, y_train)
+print(f"Model Accuracy: {accuracy_score(y_test, model.predict(X_test)):.2f}")
+
+# --------------------------
+# 5. Prediction Function
+# --------------------------
+def predict_match(home_team, away_team):
+    try:
+        known_teams = le.classes_
+        
+        if home_team not in known_teams:
+            return f"Error: '{home_team}' is not in the database. Please check spelling."
+        if away_team not in known_teams:
+            return f"Error: '{away_team}' is not in the database. Please check spelling."
+        
+        home_enc = le.transform([home_team])[0]
+        away_enc = le.transform([away_team])[0]
+        
+        # Correct features to match the two features used during training (X)
+        features = [[home_enc, away_enc]]
+        
+        pred = model.predict(features)[0]
+        prob = model.predict_proba(features)[0]
+        classes = model.classes_
+        
+        result = f"Expected result for {home_team}: {pred}\n\n"
+        for cls, p in zip(classes, prob):
+            result += f"{cls}: {p*100:.1f}%\n"
+        return result
+    except Exception as e:
+        return f"Error: {e}"
+
+# --------------------------
+# 6. User Interface and Testing
+# --------------------------
+print("\n" + "="*40)
+print("        FOOTBALL MATCH PREDICTOR")
+print("="*40)
+
+team1 = input("Enter home team name: ")
+team2 = input("Enter away team name: ")
+
+print("\n" + "="*40)
+print(predict_match(team1, team2))
+print("="*40)
