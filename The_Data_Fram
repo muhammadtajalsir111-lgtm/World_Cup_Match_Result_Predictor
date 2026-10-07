@@ -1,0 +1,17 @@
+
+!pip install kaggle
+
+!kaggle datasets download -d martj42/international-football-results-from-1872-to-2017
+
+!unzip international-football-results-from-1872-to-2017.zip
+
+import pandas as pd
+
+
+df = pd.read_csv('results.csv')
+
+
+print(df.head())
+
+print(f"Number of matches : {len(df)}")
+print(f"Column: {df.columns.tolist()}")
